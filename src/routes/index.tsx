@@ -296,11 +296,34 @@ function Categories() {
 /* ─────────────── Popular dishes ─────────────── */
 type Dish = { id: string; name: string; description: string | null; price: number; image_url: string; rating: number };
 
+function isVegDish(dishName: string): boolean {
+  const nonVegKeywords = ["chicken", "beef", "meat", "pork", "steak", "sushi", "fish", "salmon", "shrimp", "pepperoni", "bacon", "shawarma", "burger", "taco", "ramen"];
+  const nameLower = dishName.toLowerCase();
+  if (nameLower.includes("veg") || nameLower.includes("cheese") || nameLower.includes("paneer") || nameLower.includes("margherita") || nameLower.includes("salad") || nameLower.includes("dessert") || nameLower.includes("cake") || nameLower.includes("truffle pizza") || nameLower.includes("pasta")) {
+    return true;
+  }
+  return !nonVegKeywords.some(keyword => nameLower.includes(keyword));
+}
+
+function VegNonVegBadge({ name }: { name: string }) {
+  const isVeg = isVegDish(name);
+  return (
+    <div className={`inline-flex items-center justify-center w-3.5 h-3.5 border border-2/2 rounded-sm p-0.5 ${isVeg ? "border-emerald-500/80 bg-emerald-500/5" : "border-rose-500/80 bg-rose-500/5"}`}>
+      <div className={`w-1.5 h-1.5 rounded-full ${isVeg ? "bg-emerald-500" : "bg-rose-500"}`} />
+    </div>
+  );
+}
+
 function Popular() {
   const nav = useNavigate();
   const { user } = useAuth();
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [adding, setAdding] = useState<string | null>(null);
+  
+  // Filter and sort state
+  const [vegOnly, setVegOnly] = useState(false);
+  const [highRated, setHighRated] = useState(false);
+  const [priceSort, setPriceSort] = useState<"low-high" | "high-low" | null>(null);
 
   useEffect(() => {
     supabase.from("dishes").select("id, name, description, price, image_url, rating").then(({ data }) => setDishes((data as any) ?? []));
@@ -320,59 +343,113 @@ function Popular() {
     setAdding(null);
   }
 
+  // Filter and sort computation
+  const processedDishes = [...dishes]
+    .filter(d => !vegOnly || isVegDish(d.name))
+    .filter(d => !highRated || d.rating >= 4.5)
+    .sort((a, b) => {
+      if (priceSort === "low-high") return a.price - b.price;
+      if (priceSort === "high-low") return b.price - a.price;
+      return 0;
+    });
+
   return (
     <section id="popular" className="max-w-7xl mx-auto px-6 pb-24">
-      <div className="mb-12 flex items-end justify-between">
+      <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="text-xs tracking-[0.3em] uppercase mb-3" style={{ color: ORANGE }}>Popular dishes</div>
           <h2 className="text-4xl md:text-5xl font-black tracking-tight">Tonight's favorites</h2>
         </div>
+        
+        {/* Dynamic filters in Swiggy/Zomato style */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setVegOnly(!vegOnly)}
+            className={`px-4 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${vegOnly ? "border-emerald-500 bg-emerald-500/10 text-emerald-400" : "border-white/10 hover:border-white/30 text-neutral-400 hover:text-white bg-white/5"}`}
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Veg Only
+          </button>
+          <button
+            onClick={() => setHighRated(!highRated)}
+            className={`px-4 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${highRated ? "border-[#FF6A1A] bg-[#FF6A1A]/10 text-[#FF6A1A]" : "border-white/10 hover:border-white/30 text-neutral-400 hover:text-white bg-white/5"}`}
+          >
+            <Star className="w-3 h-3 fill-current" />
+            4.5+ Rating
+          </button>
+          <button
+            onClick={() => setPriceSort(priceSort === "low-high" ? "high-low" : priceSort === "high-low" ? null : "low-high")}
+            className={`px-4 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${priceSort ? "border-[#FF6A1A] bg-[#FF6A1A]/10 text-[#FF6A1A]" : "border-white/10 hover:border-white/30 text-neutral-400 hover:text-white bg-white/5"}`}
+          >
+            Price: {priceSort === "low-high" ? "Low to High" : priceSort === "high-low" ? "High to Low" : "Default"}
+          </button>
+          {(vegOnly || highRated || priceSort) && (
+            <button
+              onClick={() => { setVegOnly(false); setHighRated(false); setPriceSort(null); }}
+              className="px-3 py-2 rounded-full border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-xs font-bold text-red-400 transition cursor-pointer"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+
         <Link to="/cart" className="hidden sm:inline-flex items-center gap-2 text-sm text-neutral-300 hover:text-white">View cart <ArrowRight className="w-4 h-4" /></Link>
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {dishes.map((d, i) => (
-          <motion.div
-            key={d.id}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: (i % 3) * 0.08 }}
-            whileHover={{ y: -8 }}
-            className="group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent"
-          >
-            <div className="relative aspect-[4/3] overflow-hidden">
-              <motion.img
-                src={d.image_url}
-                alt={d.name}
-                className="w-full h-full object-cover"
-                whileHover={{ scale: 1.1 }}
-                animate={{ y: [0, -4, 0] }}
-                transition={{ y: { repeat: Infinity, duration: 4 + (i % 3), ease: "easeInOut" } }}
-              />
-              <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur text-xs">
-                <Star className="w-3 h-3 fill-current" style={{ color: ORANGE }} /> {d.rating}
-              </div>
-            </div>
-            <div className="p-5">
-              <h3 className="font-bold text-lg">{d.name}</h3>
-              <p className="text-sm text-neutral-400 mt-1 line-clamp-2">{d.description}</p>
-              <div className="mt-4 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-neutral-500">From</span>
-                  <div className="text-xl font-black" style={{ color: ORANGE }}>${Number(d.price).toFixed(2)}</div>
+      
+      {processedDishes.length === 0 ? (
+        <div className="text-center py-20 bg-white/[0.02] rounded-3xl border border-white/5">
+          <p className="text-neutral-500 text-sm">No dishes match your selected filters.</p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {processedDishes.map((d, i) => (
+            <motion.div
+              key={d.id}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: (i % 3) * 0.08 }}
+              whileHover={{ y: -8 }}
+              className="group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent"
+            >
+              <div className="relative aspect-[4/3] overflow-hidden">
+                <motion.img
+                  src={d.image_url}
+                  alt={d.name}
+                  className="w-full h-full object-cover"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ y: { repeat: Infinity, duration: 4 + (i % 3), ease: "easeInOut" } }}
+                />
+                <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur text-xs">
+                  <Star className="w-3 h-3 fill-current" style={{ color: ORANGE }} /> {d.rating}
                 </div>
-                <button
-                  onClick={() => addToCart(d)}
-                  disabled={false}
-                  className="h-11 px-5 rounded-full font-semibold text-sm text-black inline-flex items-center gap-2 disabled:opacity-60"
-                  style={{ background: `linear-gradient(135deg, ${ORANGE}, #ff8a3d)` }}
-                >
-                  {adding === d.id ? "Adding…" : <>Add <ShoppingCart className="w-4 h-4" /></>}
-                </button>
               </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <VegNonVegBadge name={d.name} />
+                  <span className="text-xs text-neutral-400 tracking-wider uppercase font-semibold">{isVegDish(d.name) ? "Veg" : "Non-Veg"}</span>
+                </div>
+                <h3 className="font-bold text-lg">{d.name}</h3>
+                <p className="text-sm text-neutral-400 mt-1 line-clamp-2">{d.description}</p>
+                <div className="mt-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-neutral-500">From</span>
+                    <div className="text-xl font-black" style={{ color: ORANGE }}>${Number(d.price).toFixed(2)}</div>
+                  </div>
+                  <button
+                    onClick={() => addToCart(d)}
+                    disabled={false}
+                    className="h-11 px-5 rounded-full font-semibold text-sm text-black inline-flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                    style={{ background: `linear-gradient(135deg, ${ORANGE}, #ff8a3d)` }}
+                  >
+                    {adding === d.id ? "Adding…" : <>Add <ShoppingCart className="w-4 h-4" /></>}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

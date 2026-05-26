@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Minus, Plus, Trash2, Star, ArrowLeft, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, Star, ArrowLeft, ShoppingBag, ChefHat } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { BottomNav } from "@/components/BottomNav";
@@ -23,6 +23,11 @@ function CartPage() {
   const { user, loading } = useAuth();
   const [items, setItems] = useState<CartRow[]>([]);
   const [busy, setBusy] = useState(true);
+  const [notes, setNotes] = useState(() => localStorage.getItem("cart_notes") ?? "");
+
+  useEffect(() => {
+    localStorage.setItem("cart_notes", notes);
+  }, [notes]);
 
   useEffect(() => {
     if (loading) return;
@@ -50,8 +55,11 @@ function CartPage() {
     load();
   }
 
+  // Check Flavora Gold status
+  const [isGold, setIsGold] = useState(() => localStorage.getItem("flavora_gold_active") === "true");
+
   const subtotal = items.reduce((s, it) => s + (it.dish?.price ?? 0) * it.quantity, 0);
-  const delivery = items.length ? 4.99 : 0;
+  const delivery = items.length ? (isGold ? 0 : 4.99) : 0;
   const total = subtotal + delivery;
 
   return (
@@ -64,7 +72,7 @@ function CartPage() {
         <span className="ml-auto text-xs text-neutral-400">{items.length} items</span>
       </header>
 
-      <div className="mx-auto max-w-md px-5 py-4 space-y-3">
+      <div className="mx-auto max-w-md px-5 py-4 space-y-4">
         {busy ? (
           <div className="text-neutral-500 text-sm text-center py-20">Loading your cart…</div>
         ) : items.length === 0 ? (
@@ -96,13 +104,13 @@ function CartPage() {
                   <div className="text-[#FF6A1A] font-bold mt-1">${it.dish?.price?.toFixed(2)}</div>
                 </div>
                 <div className="flex flex-col items-end justify-between">
-                  <button onClick={() => setQty(it.id, 0)} className="text-neutral-500 hover:text-red-500 p-1">
+                  <button onClick={() => setQty(it.id, 0)} className="text-neutral-500 hover:text-red-500 p-1 cursor-pointer">
                     <Trash2 size={16} />
                   </button>
                   <div className="flex items-center gap-2 bg-black/40 rounded-full p-1">
-                    <button onClick={() => setQty(it.id, it.quantity - 1)} className="w-7 h-7 rounded-full bg-white/10 grid place-items-center hover:bg-white/20"><Minus size={12} /></button>
+                    <button onClick={() => setQty(it.id, it.quantity - 1)} className="w-7 h-7 rounded-full bg-white/10 grid place-items-center hover:bg-white/20 cursor-pointer"><Minus size={12} /></button>
                     <span className="text-sm font-semibold w-5 text-center">{it.quantity}</span>
-                    <button onClick={() => setQty(it.id, it.quantity + 1)} className="w-7 h-7 rounded-full bg-[#FF6A1A] grid place-items-center"><Plus size={12} /></button>
+                    <button onClick={() => setQty(it.id, it.quantity + 1)} className="w-7 h-7 rounded-full bg-[#FF6A1A] grid place-items-center cursor-pointer"><Plus size={12} /></button>
                   </div>
                 </div>
               </motion.div>
@@ -110,10 +118,27 @@ function CartPage() {
           </AnimatePresence>
         )}
 
+        {/* Special Instructions card */}
+        {items.length > 0 && (
+          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 space-y-3">
+            <label className="text-sm font-semibold flex items-center gap-2 text-neutral-200">
+              <ChefHat size={16} className="text-[#FF6A1A]" />
+              Add Cooking / Delivery Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Make it extra spicy, leave at the door, ring doorbell..."
+              className="w-full h-20 bg-black/40 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-[#FF6A1A]/50 transition resize-none placeholder:text-neutral-600 text-neutral-100"
+            />
+          </div>
+        )}
+
         {items.length > 0 && (
           <div className="mt-6 bg-white/[0.04] border border-white/10 rounded-2xl p-4 space-y-2 text-sm">
             <Row label="Subtotal" value={`$${subtotal.toFixed(2)}`} />
-            <Row label="Delivery" value={`$${delivery.toFixed(2)}`} />
+            <Row label="Delivery" value={isGold ? "FREE (Gold)" : `$${delivery.toFixed(2)}`} />
+            {isGold && <div className="text-[10px] text-emerald-400 font-medium">Flavora Gold Membership Active! Free delivery applied.</div>}
             <div className="border-t border-white/10 my-2" />
             <Row label="Total" value={`$${total.toFixed(2)}`} bold />
           </div>
@@ -129,7 +154,7 @@ function CartPage() {
             </div>
             <button
               onClick={() => nav({ to: "/checkout" })}
-              className="bg-black text-white font-semibold px-6 py-3 rounded-xl hover:bg-neutral-900"
+              className="bg-black text-white font-semibold px-6 py-3 rounded-xl hover:bg-neutral-900 cursor-pointer"
             >
               Proceed to Checkout
             </button>

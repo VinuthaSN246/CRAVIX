@@ -21,6 +21,7 @@ function ProfilePage() {
   const { user, loading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dark, setDark] = useState(true);
+  const [isGold, setIsGold] = useState(() => localStorage.getItem("flavora_gold_active") === "true");
 
   useEffect(() => {
     if (loading) return;
@@ -28,6 +29,31 @@ function ProfilePage() {
     supabase.from("profiles").select("username, avatar_url, wallet_balance").eq("id", user.id).maybeSingle()
       .then(({ data }) => setProfile(data as any));
   }, [user, loading]);
+
+  async function joinGold() {
+    if (!user || !profile) return;
+    const price = 9.99;
+    if (profile.wallet_balance < price) {
+      toast.error(`Insufficient wallet balance to buy Gold! You need at least $${price.toFixed(2)}.`);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ wallet_balance: profile.wallet_balance - price })
+        .eq("id", user.id);
+      
+      if (error) throw error;
+      
+      localStorage.setItem("flavora_gold_active", "true");
+      setIsGold(true);
+      setProfile(prev => prev ? { ...prev, wallet_balance: prev.wallet_balance - price } : null);
+      toast.success("Welcome to Flavora Gold! 👑 Free delivery activated on all your orders!");
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to join Flavora Gold.");
+    }
+  }
 
   async function logout() {
     await supabase.auth.signOut();
@@ -70,14 +96,50 @@ function ProfilePage() {
 
       <div className="mx-auto max-w-md px-5 -mt-16 relative">
         <div className="bg-[#141414] border border-white/10 rounded-3xl p-5 text-center shadow-2xl">
-          <h2 className="text-xl font-bold">{name}</h2>
-          <p className="text-xs text-neutral-400">{user?.email}</p>
+          <div className="flex items-center justify-center gap-1.5">
+            <h2 className="text-xl font-bold">{name}</h2>
+            {isGold && (
+              <span className="text-[10px] tracking-wide font-black text-[#d4af37] bg-[#d4af37]/15 border border-[#d4af37]/35 rounded-full px-2 py-0.5 uppercase flex items-center gap-0.5">
+                👑 Gold
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-neutral-400 mt-0.5">{user?.email}</p>
+          
           <div className="mt-4 bg-gradient-to-r from-[#FF6A1A]/20 to-transparent border border-[#FF6A1A]/30 rounded-2xl px-4 py-3 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#FF6A1A] grid place-items-center"><Wallet size={18} className="text-white" /></div>
             <div className="text-left">
               <div className="text-xs text-neutral-400">Wallet balance</div>
               <div className="text-lg font-bold">${(profile?.wallet_balance ?? 0).toFixed(2)}</div>
             </div>
+          </div>
+        </div>
+
+        {/* Flavora Gold Premium Subscription Banner Card */}
+        <div className="mt-4 overflow-hidden relative rounded-2xl p-4 bg-gradient-to-r from-[#1E1B15] via-[#2D2313] to-[#1E1B15] border border-[#d4af37]/30 shadow-xl">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-[#d4af37]/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#d4af37] to-[#aa7c11] flex items-center justify-center text-sm shadow-md">
+              👑
+            </div>
+            <div className="flex-1 text-left">
+              <div className="text-xs font-black tracking-wider text-[#d4af37] uppercase">Flavora Gold</div>
+              <div className="text-[11px] text-neutral-300 font-medium mt-0.5">
+                {isGold ? "Unlimited Free Deliveries & Exclusive Discounts Active!" : "Waive delivery fee ($4.99) on every single order!"}
+              </div>
+            </div>
+            {isGold ? (
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-full font-bold">
+                ACTIVE
+              </span>
+            ) : (
+              <button
+                onClick={joinGold}
+                className="px-3 py-1.5 rounded-full text-xs font-black bg-gradient-to-r from-[#d4af37] to-[#f3e5ab] text-black shadow-md hover:scale-105 transition cursor-pointer"
+              >
+                Join @ $9.99
+              </button>
+            )}
           </div>
         </div>
 
@@ -93,7 +155,7 @@ function ProfilePage() {
 
         <button
           onClick={logout}
-          className="mt-5 w-full flex items-center justify-center gap-2 bg-red-500/10 border border-red-500/30 text-red-400 font-semibold py-3.5 rounded-2xl hover:bg-red-500/20"
+          className="mt-5 w-full flex items-center justify-center gap-2 bg-red-500/10 border border-red-500/30 text-red-400 font-semibold py-3.5 rounded-2xl hover:bg-red-500/20 cursor-pointer"
         >
           <LogOut size={16} /> Log out
         </button>
