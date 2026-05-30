@@ -1,0 +1,128 @@
+-- CRAVIX MySQL 8.0 schema
+CREATE DATABASE IF NOT EXISTS cravix CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE cravix;
+
+CREATE TABLE IF NOT EXISTS users (
+  id CHAR(36) PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS profiles (
+  id CHAR(36) PRIMARY KEY,
+  username VARCHAR(255) NULL,
+  email VARCHAR(255) NOT NULL,
+  avatar_url TEXT NULL,
+  wallet_balance DECIMAL(10,2) NOT NULL DEFAULT 350.00,
+  is_admin TINYINT(1) NOT NULL DEFAULT 0,
+  role ENUM('admin', 'customer') NOT NULL DEFAULT 'customer',
+  is_blocked TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_profiles_user FOREIGN KEY (id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS restaurants (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  image_url TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS dishes (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  price DECIMAL(10,2) NOT NULL,
+  image_url TEXT NOT NULL,
+  rating DECIMAL(2,1) NOT NULL DEFAULT 4.8,
+  category VARCHAR(100) NOT NULL DEFAULT 'Popular',
+  is_available TINYINT(1) NOT NULL DEFAULT 1,
+  ingredients JSON NULL,
+  nutrition JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS dish_addons (
+  id CHAR(36) PRIMARY KEY,
+  dish_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  CONSTRAINT fk_addons_dish FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS cart_items (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  dish_id CHAR(36) NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_cart_user_dish (user_id, dish_id),
+  CONSTRAINT fk_cart_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cart_dish FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS addresses (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  label VARCHAR(100) NOT NULL,
+  address TEXT NOT NULL,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_addresses_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  total DECIMAL(10,2) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+  address TEXT NULL,
+  payment_method VARCHAR(50) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id CHAR(36) PRIMARY KEY,
+  order_id CHAR(36) NOT NULL,
+  dish_id CHAR(36) NULL,
+  name VARCHAR(255) NOT NULL,
+  price DECIMAL(10,2) NOT NULL,
+  quantity INT NOT NULL,
+  image_url TEXT NULL,
+  CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_items_dish FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS favorites (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  dish_id CHAR(36) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_fav_user_dish (user_id, dish_id),
+  CONSTRAINT fk_favorites_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_favorites_dish FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  dish_id CHAR(36) NOT NULL,
+  order_id CHAR(36) NOT NULL,
+  rating INT NOT NULL,
+  comment TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_review_user_dish_order (user_id, dish_id, order_id),
+  CONSTRAINT fk_reviews_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_reviews_dish FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_reviews_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  CONSTRAINT chk_rating CHECK (rating BETWEEN 1 AND 5)
+);

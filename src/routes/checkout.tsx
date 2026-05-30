@@ -6,21 +6,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { BottomNav } from "@/components/BottomNav";
 import { toast } from "sonner";
+import { GOLD_KEY } from "@/lib/constants";
 
 export const Route = createFileRoute("/checkout")({
   component: CheckoutPage,
-  head: () => ({ meta: [{ title: "Checkout — Flavora Kitchen" }] }),
+  head: () => ({ meta: [{ title: "Checkout — CRAVIX" }] }),
 });
 
 const ADDRESSES = [
   { id: "home", label: "Home", icon: Home, address: "123 Sunset Blvd, Apt 4B" },
-  { id: "work", label: "Work", icon: Briefcase, address: "Flavora HQ, 200 Market St" },
+  { id: "work", label: "Work", icon: Briefcase, address: "CRAVIX HQ, 200 Market St" },
 ];
 
 const PAYMENTS = [
   { id: "cash", label: "Cash on Delivery", icon: Banknote },
   { id: "card", label: "Credit / Debit Card", icon: CreditCard },
-  { id: "wallet", label: "E-Wallet (Flavora Wallet)", icon: Wallet },
+  { id: "wallet", label: "E-Wallet (CRAVIX Wallet)", icon: Wallet },
 ];
 
 type CartRow = {
@@ -38,8 +39,13 @@ function CheckoutPage() {
   const [busy, setBusy] = useState(false);
 
   // Custom states for promo codes & stashed notes
-  const [isGold] = useState(() => localStorage.getItem("flavora_gold_active") === "true");
-  const [notes] = useState(() => localStorage.getItem("cart_notes") ?? "");
+  const [isGold, setIsGold] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    setIsGold(localStorage.getItem(GOLD_KEY) === "true");
+    setNotes(localStorage.getItem("cart_notes") ?? "");
+  }, []);
   const [promoCode, setPromoCode] = useState("");
   const [activeCoupon, setActiveCoupon] = useState<{ code: string; discount: number; type: "flat" | "percent" | "free_del" } | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -50,6 +56,7 @@ function CheckoutPage() {
     supabase
       .from("cart_items")
       .select("id, quantity, dish:dishes(id, name, price, image_url)")
+      .eq("user_id", user.id)
       .then(({ data }) => setItems((data as any) ?? []));
 
     // Fetch wallet balance
@@ -150,7 +157,7 @@ function CheckoutPage() {
 
       await supabase.from("cart_items").delete().eq("user_id", user.id);
       localStorage.removeItem("cart_notes"); // clear instructions
-      nav({ to: "/order-done" });
+      nav({ to: "/order-done", search: { orderId: order.id } });
     } catch (e: any) {
       toast.error(e.message ?? "Failed to place order");
     } finally {

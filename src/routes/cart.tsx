@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { BottomNav } from "@/components/BottomNav";
 import { toast } from "sonner";
+import { GOLD_KEY } from "@/lib/constants";
 
 export const Route = createFileRoute("/cart")({
   component: CartPage,
@@ -23,7 +24,13 @@ function CartPage() {
   const { user, loading } = useAuth();
   const [items, setItems] = useState<CartRow[]>([]);
   const [busy, setBusy] = useState(true);
-  const [notes, setNotes] = useState(() => localStorage.getItem("cart_notes") ?? "");
+  const [notes, setNotes] = useState("");
+  const [isGold, setIsGold] = useState(false);
+
+  useEffect(() => {
+    setNotes(localStorage.getItem("cart_notes") ?? "");
+    setIsGold(localStorage.getItem(GOLD_KEY) === "true");
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("cart_notes", notes);
@@ -40,6 +47,7 @@ function CartPage() {
     const { data, error } = await supabase
       .from("cart_items")
       .select("id, quantity, dish:dishes(id, name, price, image_url, rating)")
+      .eq("user_id", user!.id)
       .order("created_at", { ascending: true });
     if (error) toast.error(error.message);
     setItems((data as any) ?? []);
@@ -55,8 +63,7 @@ function CartPage() {
     load();
   }
 
-  // Check Flavora Gold status
-  const [isGold, setIsGold] = useState(() => localStorage.getItem("flavora_gold_active") === "true");
+  // Check CRAVIX Gold status
 
   const subtotal = items.reduce((s, it) => s + (it.dish?.price ?? 0) * it.quantity, 0);
   const delivery = items.length ? (isGold ? 0 : 4.99) : 0;
